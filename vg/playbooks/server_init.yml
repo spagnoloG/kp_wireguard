@@ -1,6 +1,9 @@
 ---
 - hosts: all
   become: yes
+  vars:
+    peer_node_privkeys: []
+    peer_node_pubkeys: []
   tasks:
     - name: Install wireguard and ufw
       ansible.builtin.apt:
@@ -12,14 +15,46 @@
     - name: Generate a wireguard server privatekey
       ansible.builtin.shell: "wg genkey > /etc/wireguard/private.key"
 
+    - name: Read privatekey from the wireguard folder and generate public key
+      ansible.builtin.shell: "cat /etc/wireguard/private.key | wg pubkey"
+      register: root_node_public_key_stdout
+
     - name: Read privatekey from the wireguard folder
       ansible.builtin.shell: "cat /etc/wireguard/private.key"
-      register: server_private_key_stdout
+      register: root_node_private_key_stdout
+
+    - name: Create keys directory
+      ansible.builtin.file:
+        path: "/tmp/keys"
+        state: directory
 
     - name: Set the file content to a variable
       ansible.builtin.set_fact:
-        server_private_key: "{{ server_private_key_stdout.stdout }}"
+        root_node_public_key: "{{ root_node_public_key_stdout.stdout }}"
+        root_node_private_key: "{{ root_node_private_key_stdout.stdout }}"
 
+    - name: Generate privatekeys for the peer nodes
+      ansible.builtin.shell: "wg genkey > /tmp/keys/peer{{ item }}_private_key.txt"
+      loop: "{{ range(1, n_peer_nodes + 1) | list }}"
+
+    - name: Generate pubkeys for the peer nodes
+      ansible.builtin.shell: "cat /tmp/keys/peer{{ item }}_private_key.txt |  wg pubkey > /tmp/keys/peer{{ item }}_public_key.txt"
+      loop: "{{ range(1, n_peer_nodes + 1) | list }}"
+
+    - name: Copy generated private keys to temporal keys location
+      ansible.builtin.fetch:
+        src: "/tmp/keys/peer{{ item }}_private_key.txt"
+        dest: "./keys/peer{{ item }}_private_key.txt"
+        flat: yes
+      loop: "{{ range(1, n_peer_nodes + 1) | list }}"
+
+    - name: Copy generated public keys to temporal keys location
+      ansible.builtin.fetch:
+        src: "/tmp/keys/peer{{ item }}_public_key.txt"
+        dest: "./keys/peer{{ item }}_public_key.txt"
+        flat: yes
+      loop: "{{ range(1, n_peer_nodes + 1) | list }}"
+         
     - name: Get the default public interface
       ansible.builtin.shell: "ip route list | grep default | awk '{print $5}'"
       register: server_public_interface_stdout
@@ -27,6 +62,14 @@
     - name: Set the stdout of the public interface to a variable
       ansible.builtin.set_fact:
         server_public_interface: "{{ server_public_interface_stdout.stdout }}"
+
+    - name: Temporal remap of the interface to eth1
+      ansible.builtin.set_fact:
+        server_public_interface: "eth1"
+
+    - name: show the eth1 interface address
+      ansible.builtin.debug:
+        msg: "{{  ansible_eth1.ipv4.address }}"
 
     - name: Protect the privatekey by allowing only the root user to read
       ansible.builtin.file:
@@ -46,7 +89,7 @@
 
     - name: Install the server wireguard template to the server
       ansible.builtin.template:
-        src: "server_wg0.conf"
+        src: "./templates/server_wg0.conf"
         dest: "/etc/wireguard/wg0.conf"
 
     - name: Ensure that the permissions to the config are not too open
@@ -81,3 +124,17 @@
         name: wg-quick@wg0.service
         enabled: yes
         state: started
+
+    - name: Store the public to temportal directory so that the clients will be able to read it
+      ansible.builtin.copy:
+        content: "{{ root_node_public_key }}"
+        dest: "./keys/root_node_public_key.txt"
+      become: false
+      delegate_to: localhost
+
+    - name: Store the public ip of the node to temportal directory so that the clients will be able to read it
+      ansible.builtin.copy:
+        content: "{{ ansible_eth1.ipv4.address }}"
+        dest: "./keys/root_node_public_ip.txt"
+      become: false
+      delegate_to: localhost

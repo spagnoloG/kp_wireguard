@@ -1,0 +1,33 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Install wireguard and ufw
+      ansible.builtin.apt:
+        name: 
+          - wireguard
+        state: present
+
+    - name: Get the machine hostname
+      ansible.builtin.shell: hostname
+      register: hostname_stdout
+
+    - name: Gather the root node public ip, and its privatekey
+      ansible.builtin.set_fact:
+        root_node_public_ip: "{{ lookup('file', './keys/root_node_public_ip.txt') }}"
+        root_node_public_key: "{{ lookup('file', './keys/root_node_public_key.txt') }}" 
+        peer_id: " {{ hostname_stdout.stdout | regex_replace('^.*?(\\d+)$', '\\1') }}"
+
+    - name: Set privateky location
+      ansible.builtin.set_fact:
+        private_keyfile_location: "./keys/peer{{ peer_id | trim }}_private_key.txt"
+
+    - name: Read privatekey
+      ansible.builtin.set_fact:
+        peer_node_private_key: "{{ lookup('file', private_keyfile_location) }}"
+
+
+    - name: Install the peer wireguard template to the server
+      ansible.builtin.template:
+        src: "./templates/peer_wg0.conf"
+        dest: "/etc/wireguard/wg0.conf"
