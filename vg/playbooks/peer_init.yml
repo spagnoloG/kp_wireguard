@@ -26,8 +26,13 @@
       ansible.builtin.set_fact:
         peer_node_private_key: "{{ lookup('file', private_keyfile_location) }}"
 
-
     - name: Install the peer wireguard template to the server
       ansible.builtin.template:
         src: "./templates/peer_wg0.conf"
         dest: "/etc/wireguard/wg0.conf"
+
+    - name: Start the wireguard service
+      ansible.builtin.service:
+        name: wg-quick@wg0.service
+        enabled: yes
+        state: started

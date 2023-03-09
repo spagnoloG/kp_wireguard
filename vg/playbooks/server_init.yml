@@ -2,7 +2,6 @@
 - hosts: all
   become: yes
   vars:
-    peer_node_privkeys: []
     peer_node_pubkeys: []
   tasks:
     - name: Install wireguard and ufw
@@ -40,7 +39,7 @@
     - name: Generate pubkeys for the peer nodes
       ansible.builtin.shell: "cat /tmp/keys/peer{{ item }}_private_key.txt |  wg pubkey > /tmp/keys/peer{{ item }}_public_key.txt"
       loop: "{{ range(1, n_peer_nodes + 1) | list }}"
-
+ 
     - name: Copy generated private keys to temporal keys location
       ansible.builtin.fetch:
         src: "/tmp/keys/peer{{ item }}_private_key.txt"
@@ -55,6 +54,13 @@
         flat: yes
       loop: "{{ range(1, n_peer_nodes + 1) | list }}"
          
+    - name: Fill in the pubkeys array
+      ansible.builtin.set_fact:
+        peer_node_pubkeys: "{{ peer_node_pubkeys + [lookup('file', './keys/peer'+item|string+'_public_key.txt') | string] }}"
+      loop: "{{ range(1, n_peer_nodes + 1) | list }}"
+      become: false
+      delegate_to: localhost
+
     - name: Get the default public interface
       ansible.builtin.shell: "ip route list | grep default | awk '{print $5}'"
       register: server_public_interface_stdout
@@ -138,3 +144,7 @@
         dest: "./keys/root_node_public_ip.txt"
       become: false
       delegate_to: localhost
+
+    - name: Add each peer to root node configuration
+      ansible.builtin.shell: "wg set wg0 peer {{ peer_node_pubkeys[item] }} allowed-ips 10.6.0.{{ item+2 }}"
+      loop: "{{ range(0, n_peer_nodes) | list }}" 
