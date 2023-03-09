@@ -1,0 +1,83 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: Install wireguard and ufw
+      ansible.builtin.apt:
+        name: 
+          - wireguard
+          - ufw
+        state: present
+
+    - name: Generate a wireguard server privatekey
+      ansible.builtin.shell: "wg genkey > /etc/wireguard/private.key"
+
+    - name: Read privatekey from the wireguard folder
+      ansible.builtin.shell: "cat /etc/wireguard/private.key"
+      register: server_private_key_stdout
+
+    - name: Set the file content to a variable
+      ansible.builtin.set_fact:
+        server_private_key: "{{ server_private_key_stdout.stdout }}"
+
+    - name: Get the default public interface
+      ansible.builtin.shell: "ip route list | grep default | awk '{print $5}'"
+      register: server_public_interface_stdout
+
+    - name: Set the stdout of the public interface to a variable
+      ansible.builtin.set_fact:
+        server_public_interface: "{{ server_public_interface_stdout.stdout }}"
+
+    - name: Protect the privatekey by allowing only the root user to read
+      ansible.builtin.file:
+        path: "/etc/wireguard/private.key"
+        owner: root
+        group: root
+        mode: '077'
+
+    - name: Generate a wireguard server pubkey
+      ansible.builtin.shell: "cat /etc/wireguard/private.key | wg pubkey > /etc/wireguard/public.key"
+
+    - name: Protect the privatekey by allowing only the root user to read
+      ansible.builtin.file:
+        path: "/etc/wireguard/public.key"
+        owner: root
+        group: root
+
+    - name: Install the server wireguard template to the server
+      ansible.builtin.template:
+        src: "server_wg0.conf"
+        dest: "/etc/wireguard/wg0.conf"
+
+    - name: Ensure that the permissions to the config are not too open
+      ansible.builtin.file:
+        path: "/etc/wireguard/wg0.conf"
+        owner: root
+        group: root
+        mode: '077'
+
+    - name: Allow everything and enable UFW
+      community.general.ufw:
+        state: enabled
+        policy: allow
+
+    - name: Set logging for the ufw
+      community.general.ufw:
+        logging: 'on'
+
+    - name: Allow all access to port 22
+      community.general.ufw:
+        rule: allow
+        port: '22'
+
+    - name: Allow all access to wireguard port (udp)
+      community.general.ufw:
+        rule: allow
+        port: '51820'
+        proto: udp
+
+    - name: Start the wireguard service
+      ansible.builtin.service:
+        name: wg-quick@wg0.service
+        enabled: yes
+        state: started
