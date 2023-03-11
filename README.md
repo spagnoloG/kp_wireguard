@@ -1,4 +1,4 @@
-# Wireguard automated install with vagrant and asnible provision
+# Wireguard automated install with vagrant and ansible provision
 
 
 ## Dependencies:
@@ -21,13 +21,11 @@ Ansible:
 ansible-galaxy install -r requirements.yml
 ```
 
-
 ## Start
 ```bash
 ./virsh_network/start.sh
 cd vg && vagrant up --provider=libvirt --no-parallel
 ```
-
 
 ## Destroy the environment
 ```bash
@@ -35,3 +33,14 @@ vagrant destroy
 ./virsh_network/destroy.sh
 ```
 
+
+## Report
+```bash
+zathura report/report.pdf
+```
+
+## Wireshark captures
+```bash
+wireshark pcap/eth1_traffic.pcap # public interface (encrypted traffic)
+wiershark pcap/wg0_traffic.pcap # wireguard interface (decrypted traffic)
+```
