@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 #
-n_peer_nodes = 4
+n_peer_nodes = 2
 
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/ubuntu2004"
@@ -27,7 +27,7 @@ Vagrant.configure("2") do |config|
       ansible.playbook = "playbooks/server_init.yml"
       ansible.become = true
       ansible.host_key_checking = false
-      ansible.verbose = "vvvvv"
+      ansible.verbose = "vv"
       ansible.extra_vars = {
         "n_peer_nodes" => n_peer_nodes 
       }
