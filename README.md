@@ -43,4 +43,8 @@ zathura report/report.pdf
 ```bash
 wireshark pcap/eth1_traffic.pcap # public interface (encrypted traffic)
 wiershark pcap/wg0_traffic.pcap # wireguard interface (decrypted traffic)
+wiershark pcap/keep_alive.pcap # public interface (encrypted traffic, keepalive packets)
 ```
+
+## Good resource about wireguard
+- [github](https://github.com/pirate/wireguard-docs)

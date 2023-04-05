@@ -148,3 +148,16 @@
     - name: Add each peer to root node configuration
       ansible.builtin.shell: "wg set wg0 peer {{ peer_node_pubkeys[item] }} allowed-ips 10.6.0.{{ item+2 }}"
       loop: "{{ range(0, n_peer_nodes) | list }}" 
+
+
+# Enable IP forwarding on the peer through which other devices on the network will connect to WireGuard peer
+# sysctl -w net.ipv4.ip_forward=1
+# sysctl -w net.ipv6.conf.all.forwarding=1
+#
+#
+#
+# ENABLE LOGGING FOR DEBUGGING
+# modprobe wireguard
+# echo module wireguard +p > /sys/kernel/debug/dynamic_debug/control
+# dmesg -wH
+
