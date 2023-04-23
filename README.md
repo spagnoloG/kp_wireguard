@@ -64,17 +64,31 @@ dmesg -wH
 
 ## Run in docker
 ```yml
-version: '3'
-
+version: "3"
 services:
   wireguard:
-    image: linuxserver/wireguard
-    ports:
-      - 51820:51820/udp
-    cap_add:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add: # Possible container escape so keep that in mind
       - NET_ADMIN
       - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Ljubljana
+      - SERVERURL=xx.xx.xx.xx # Server IP
+      - SERVERPORT=51820 # Check the firewall 
+      - PEERS=1 # This is how many configs will be generated on initial start of container
+      - PEERDNS=auto 
+      - INTERNAL_SUBNET=10.13.13.0
+      - ALLOWEDIPS=0.0.0.0/0 #
+      - LOG_CONFS=true
     volumes:
+      - ./wg-config:/config
       - /lib/modules:/lib/modules
-      - ./wg0.conf:/config/wg0.conf:ro
+    ports:
+      - 51820:51820/udp
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1 # Enable router mode (share local network)
+    restart: unless-stopped
 ```
